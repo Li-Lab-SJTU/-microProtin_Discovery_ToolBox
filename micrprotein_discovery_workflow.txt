@@ -1,0 +1,77 @@
+Before start this workflow, run the command below first!
+command: chmod +x script/*
+
+1. Genome inference
+Put the reference genome in FASTA format in reference folder. Replace the "genome.fasta" with the name of the refererence genome file in command line below.
+Example fasta file format:
+>Contaminant_Trypa1 VATVSLPR-like Promega trypsin artifact 1 (871.1) xATVSLPR (PromTArt1)
+QATVSLPR
+If the sequences are in multiple lines, use the script 00-seq-connect to modify the file
+command: ./script/00-seq-connect reference/genome.fasta | tail -n +3 > reference/genome_connect.fasta
+command: mv reference/genome_connect.fasta reference/genome.fasta
+
+command: ./script/01-ORFScan reference/genome.fasta min_orf_length max_orf_length DNA prediction/out_microprotein.fasta prediction/out_smorf.fasta
+# genome.fasta: reference genome in fasta format
+# min_orf_length: set the minimum length for ORF
+# max_orf_length: set the maximum length for ORF
+# type: DNA or RNA
+# out_microprotein.fasta: file name for all ORFs scanned from the reference sequences in fasta format
+# out_smorf.fasta: file name for all gene sequences correspond to ORFs from the reference sequences in fasta format
+
+Put the NR proteins in FASTA format in reference folder. Replace the "nr.fasta" with the name of the NR proteins file in command line below.
+command: ./script/02-uniq-sequence prediction/out_microprotein.fasta > tmp/uniq_microprotein.fasta
+command: ./script/03-rm-known reference/nr.fasta tmp/uniq_microprotein.fasta > prediction/potential_microprotein.fasta
+
+2. RNA-seq data analysis
+Put the RNA sequencing clean data in FASTQ format in align-then-assemble/fastq folder. Replace the "*" with the sample name of the RNA-seq data file in command line below.
+If the analysis is not for human, please prepare the genome index file to replace the "index_grch38" in command below
+Put the reference genome in GTF format in reference folder. Replace the "genome.gtf" with the name of the refererence genome file in command line below.
+command: hisat2 -p 16 --dta -x align-then-assemble/index_grch38/genome -1 align-then-assemble/fastq/*_1.fastq -2 align-then-assemble/fastq/*_2.fastq -S align-then-assemble/sam/*.sam
+command: samtools sort -@ 16 -o align-then-assemble/bam/*.bam align-then-assemble/sam/*.sam
+command: stringtie -p 16 -G reference/genome.gtf -o align-then-assemble/assemble/*.gtf -l * align-then-assemble/bam/*.bam
+command: stringtie --merge -p 16 -G reference/genome.gtf -o align-then-assemble/assemble/stringtie_merged_mapped_reads.gtf mapped_reads_merge.txt
+command: gtf_to_fasta align-then-assemble/assemble/stringtie_merged_mapped_reads.gtf reference/genome.fasta align-then-assemble/transcript/mapped_reads_merged.fa
+command: cpat.py -g align-then-assemble/transcript/mapped_reads_merged.fa -d software/CPAT-2.0.0/dat/Human_logitModel.RData -x software/CPAT-2.0.0/dat/Human_Hexamer.tsv -o align-then-assemble/transcript/coding_mapped_reads_merged.out -s ATG,TTG,CTG,GTG
+select the transcripts with coding potential based on  the species used in analysis, extract the name and put the "name_coding_mapped_transcripts.txt" file in  align-then-assemble/transcript folder
+command: ./script/04-coding-transcripts align-then-assemble/transcript/name_coding_mapped_transcripts.txt align-then-assemble/transcript/mapped_reads_merged.fa > align-then-assemble/transcript/seq_coding_mapped_transcripts.fa
+command: hisat2-build -p 16 align-then-assemble/transcript/seq_coding_mapped_transcripts.fa align-then-assemble/index_coding_trans/index_coding_trans
+command: hisat2 -p 16 --dta -x align-then-assemble/index_coding_trans/index_coding_trans -1 align-then-assemble/fastq/*_1.fastq -2 align-then-assemble/fastq/*_2.fastq -S align-then-assemble/get_unmapped_reads/*.sam
+command: samtools sort -@ 16 -o align-then-assemble/get_unmapped_reads/*.bam align-then-assemble/get_unmapped_reads/*.sam
+command: samtools fastq -f 12 -1 align-then-assemble/get_unmapped_reads/unmapped_*_1.fastq -2 align-then-assemble/get_unmapped_reads/unmapped_*_2.fastq align-then-assemble/get_unmapped_reads/*.bam
+command: Trinity --seqType fq --left align-then-assemble/get_unmapped_reads/unmapped_*7_1.fastq --right align-then-assemble/get_unmapped_reads/unmapped_*_2.fastq --full_cleanup --CPU 8 --max_memory 25G --output align-then-assemble/trinity/*_trinity
+command: cpat.py -g align-then-assemble/trinity/*_trinity.Trinity.fasta -d software/CPAT-2.0.0/dat/Human_logitModel.RData -x software/CPAT-2.0.0/dat/Human_Hexamer.tsv -o align-then-assemble/trinity/*_coding_unmapped_reads.out -s ATG,TTG,CTG,GTG
+select the transcripts with coding potential based on  the species used in analysis, extract the name and put the "name_coding_unmapped_transcripts.txt" file in  align-then-assemble/trinity folder
+command: ./script/04-coding-transcripts align-then-assemble/trinity/name_coding_unmapped_transcripts.txt align-then-assemble/trinity/*_trinity.Trinity.fasta > align-then-assemble/transcript/seq_coding_unmapped_transcripts.fa
+command: cat align-then-assemble/transcript/seq_coding_*_transcripts.fa > align-then-assemble/transcript/seq_coding_transcripts.fa
+command: ./script/00-seq-connect align-then-assemble/transcript/seq_coding_transcripts.fa | tail -n +3 > align-then-assemble/transcript/seq_coding_transcripts_connect.fasta
+command: mv align-then-assemble/transcript/seq_coding_transcripts_connect.fasta align-then-assemble/transcript/seq_coding_transcripts.fa
+command: ./script/01-ORFScan align-then-assemble/transcript/seq_coding_transcripts.fa min_orf_length max_orf_length RNA align-then-assemble/transcript/out_coding_orf.fasta tmp/out_coding_rna.fasta
+
+3. Expression filter
+command: diamond makedb --in align-then-assemble/transcript/out_coding_orf.fasta --db align-then-assemble/dic_trans/ORF_3frame
+command: diamond blastp --db align-then-assemble/dic_trans/ORF_3frame.dmnd -q prediction/potential_microprotein.fasta -o prediction/blastp_microprotein2codingTrans.txt -e 0.00001 -k 1 --id 80 --strand plus
+command: awk '{print $1}' prediction/blastp_microprotein2codingTrans.txt > prediction/smORFdblist.txt
+command: ./script/05-get-novel-seq prediction/smORFdblist.txt prediction/potential_microprotein.fasta > prediction/candidate_microprotein.fa
+
+4. Identification
+Put the UniProt proteins in FASTA format in reference folder. Replace the "uniprot.fasta" with the name of the UniProt proteins file in command line below.
+Put Thermo raw files in identification/sample folder.  The .raw files will be converted to the mzML or mgf format using Proteowizard's MSConvert tool. 
+command: cat prediction/candidate_microprotein.fa reference/uniprot.fasta > software/tandem-linux-17-02-01-4/fasta/novel_search.fasta
+command: cd software/tandem-linux-17-02-01-4/bin
+set the parameter for database search according to the proteome experiments in "default_input.xml" file.
+command: perl run_tandem.pl input_1.xml ../identification/sample/ ../identification/dbsearch_out
+command: cd ../../../
+command: ./script/06-identification identification/dbsearch_out/output* > identification/fdr_control/ident_all.txt
+command: ./script/07-divide-over2scan identification/fdr_control/ident_all.txt tmp/known.txt identification/fdr_control/novel_psm.txt species
+#species: the species marked in sequence name. (Example: HUMAN)
+command: ./script/08-get-known tmp/known.txt > result/known_ident.txt
+command: awk -F "[#\t]" '{print $2}'  identification/fdr_control/novel_psm.txt | sort -u > tmp/novel.pep
+command: ./script/09-get-pep-fa tmp/novel.pep > tmp/novel.pep.fa
+command: diamond makedb --in reference/uniprot.fasta --db identification/dic_uniprot/uniprot.dmnd
+command: diamond blastp --db identification/dic_uniprot/uniprot.dmnd -q tmp/novel.pep.fa -o tmp/novel-pep-blast.txt --strand plus
+command: ./script/10-filter-blast-result reference/uniprot.fasta tmp/novel-pep-blast.txt > tmp/sav.fliter
+command: ./script/11-get-filter-pep-seq tmp/sav.fliter tmp/novel.pep.fa > tmp/novel_ident.pep.fa
+command: ./script/12-get-novel-ident-final prediction/candidate_microprotein.fa identification/fdr_control/novel_psm.txt tmp/sav.fliter > tmp/novel.txt
+command: ./script/13-get-novel tmp/novel.txt > result/novel_ident.txt
+
+Finished!

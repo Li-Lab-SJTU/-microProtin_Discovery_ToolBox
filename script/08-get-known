@@ -1,0 +1,27 @@
+#!/usr/bin/perl -w
+use utf8;
+use strict;use warnings;
+
+open (IN,"<$ARGV[0]") or die "could not open the result file!\n";
+
+my @line;
+my @pro;
+my $pep;
+
+while (<IN>) {
+	chomp;
+	@line = split(/\t/,$_);
+	$line[0] =~ /(.+)\#(\w+)/;
+	@pro = split(/\^/,$1);
+	$pep = $2;
+	for (my $i = 0; $i < @pro; $i++) {
+		if ($pro[$i] =~ /smORF_/) {
+			next;
+		}
+		else {
+			print "$pro[$i]\t$pep\t$line[1]\t$line[2]\t$line[3]\n";
+		}
+	}
+}
+
+close IN;

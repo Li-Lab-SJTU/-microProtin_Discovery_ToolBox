@@ -1,0 +1,110 @@
+#!/usr/bin/perl -w
+use utf8;
+use strict;use warnings;
+
+open (FA,"<$ARGV[0]") or die "could not open the result file!\n";
+open (IN,"<$ARGV[1]") or die "could not open the ref file!\n";
+open (RM,"<$ARGV[2]") or die "could not open the ref file!\n";
+
+my @filter = <RM>;
+chomp @filter;
+
+my %db;
+my $name;
+
+while (<FA>) {
+	chomp;
+	if (/>(smORF_\d+)\|/) {
+		$name = $1;
+	}
+	elsif (/[A-Z]+/) {
+		$db{$name} = $_;
+	}
+	else {
+		next;
+	}
+}
+
+my %index;
+my $pep;
+my $info;
+my @ident;
+
+while (<IN>) {
+	chomp;
+	if (/\#([A-Z]+)\t(\d+.+)/) {
+		$pep = $1;
+		$info = $2;
+		if (grep /^$pep$/,@filter) {
+			next;
+		}
+		else {
+			if (exists $index{$pep}) {
+				$index{$pep} = $index{$pep}."&".$info;
+			}
+			else {
+				$index{$pep} = $info;
+				push @ident,$pep;
+			}
+		}
+	}
+	else {
+		next;
+	}
+}
+
+my %result;
+my $tag;
+
+foreach (keys %db) {
+	$name = $_;
+	for (my $i = 0; $i < @ident; $i++) {
+		if ($ident[$i] =~ /(K|R)$/) {
+			if ($db{$name} =~ /^$ident[$i]/ or $db{$name} =~ /^M$ident[$i]/ or $db{$name} =~ /^M\w$ident[$i]/ or $db{$name} =~ /(K|R)$ident[$i]/) {
+				my @hhh = split(/&/,$index{$ident[$i]});
+				for (my $j = 0; $j < @hhh; $j++) {
+					$tag = $ident[$i]."\t".$hhh[$j];
+					if (exists $result{$tag}) {
+						if ($result{$tag} =~ /^$name\^/ or $result{$tag} =~ /\^$name\^/ or $result{$tag} =~ /\^$name$/) {
+							next;
+						}
+						else {
+							$result{$tag} = $result{$tag}."^".$name;
+						}
+                                        }
+                                        else {
+                                                $result{$tag} = $name;
+                                        }
+                        	}
+			}
+		}
+		else {
+			if ($db{$name} =~ /(K|R)$ident[$i]$/ or $db{$name} =~ /^$ident[$i]$/) {
+				my @hhh = split(/&/,$index{$ident[$i]});
+                                for (my $j = 0; $j < @hhh; $j++) {
+                			$tag = $ident[$i]."\t".$hhh[$j];
+					if (exists $result{$tag}) {
+                                        	if ($result{$tag} =~ /^$name\^/ or $result{$tag} =~ /\^$name\^/ or $result{$tag} =~ /\^$name$/) {
+                                                        next;
+                                                }
+                                                else {
+                                                        $result{$tag} = $result{$tag}."^".$name;
+                                                }
+                                	}
+                                	else {
+                                        	$result{$tag} = $name;
+                                	}
+                                }
+			}
+		}
+	}
+}
+
+foreach (keys %result) {
+        print "$result{$_}\t$_\n";
+}
+
+close RM;
+close IN;
+close FA;
+

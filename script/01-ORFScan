@@ -1,0 +1,324 @@
+#!/usr/bin/perl -w                                             
+use utf8;
+use strict;
+use warnings;
+
+my %index=(TTT=>"F",TTC=>"F",TTA=>"L",TTG=>"L",TCT=>"S",TCC=>"S",TCA=>"S",TCG=>"S",TAT=>"Y",TAC=>"Y",TGT=>"C",TGC=>"C",TGG=>"W",CTT=>"L",CTC=>"L",CTA=>"L",CTG=>"L",CCT=>"P",CCC=>"P",CCA=>"P",CCG=>"P",CAT=>"H",CAC=>"H",CAA=>"Q",CAG=>"Q",CGT=>"R",CGC=>"R",CGA=>"R",CGG=>"R",ATT=>"I",ATC=>"I",ATA=>"I",ATG=>"M",ACT=>"T",ACC=>"T",ACA=>"T",ACG=>"T",AAT=>"N",AAC=>"N",AAA=>"K",AAG=>"K",AGT=>"S",AGC=>"S",AGA=>"R",AGG=>"R",GTT=>"V",GTC=>"V",GTA=>"V",GTG=>"V",CT=>"A",GCC=>"A",GCA=>"A",GCG=>"A",GAT=>"D",GAC=>"D",GAA=>"E",GAG=>"E",GGT=>"G",GGC=>"G",GGA=>"G",GGG=>"G",NNN=>"-");
+my %index_r=(AAA=>"F",AAG=>"F",AAT=>"L",AAC=>"L",AGA=>"S",AGG=>"S",AGT=>"S",AGC=>"S",ATA=>"Y",ATG=>"Y",ACA=>"C",ACG=>"C",ACC=>"W",GAA=>"L",GAG=>"L",GAT=>"L",GAC=>"L",GGA=>"P",GGG=>"P",GGT=>"P",GGC=>"P",GTA=>"H",GTG=>"H",GTT=>"Q",GTC=>"Q",GCA=>"R",GCG=>"R",GCT=>"R",GCC=>"R",TAA=>"I",TAG=>"I",TAT=>"I",TAC=>"M",TGA=>"T",TGG=>"T",TGT=>"T",TGC=>"T",TTA=>"N",TTG=>"N",TTT=>"K",TTC=>"K",TCA=>"S",TCG=>"S",TCT=>"R",TCC=>"R",CAA=>"V",CAG=>"V",CAT=>"V",CAC=>"V",CGA=>"A",CGG=>"A",CGT=>"A",CGC=>"A",CTA=>"D",CTG=>"D",CTT=>"E",CTC=>"E",CCA=>"G",CCG=>"G",CCT=>"G",CCC=>"G",NNN=>"-");
+
+my $chr;
+my $seq = "";
+my $seq_r = "";
+my $len;
+my $code = "";
+my $code_r = "";
+my $codon = "";
+my $codon_r = "";
+my $orf = "";
+my $gene = "";
+my $start_point;
+my $end_point;
+my $start1 = "ATG";
+my $start2 = "TTG";
+my $start3 = "CTG";
+my $start4 = "GTG";
+my $start1_r = "TAC";
+my $start2_r = "AAC";
+my $start3_r = "GAC";
+my $start4_r = "CAC";
+my $end1="TAA";
+my $end2="TGA";
+my $end3="TAG";
+my $end1_r="ATT";
+my $end2_r="ACT";
+my $end3_r="ATC";
+
+my $type = uc $ARGV[3];
+
+open (IN,"<$ARGV[0]")||die "could not open the name file!";
+open (PRO,">$ARGV[4]") or die "could not write the pro file!\n";
+open (GENE,">$ARGV[5]") or die "could not write the gene file!\n";
+my $min = $ARGV[1];
+my $max = $ARGV[2];
+while (<IN>) {
+	chomp;
+	if (/^>(.+)/) {
+		$chr = $1;
+	}
+	else {
+		$seq = uc $_;
+		$seq_r = uc(reverse $_);
+		$len = length $seq;
+
+		#strand +
+		for (my $i = 0; $i < $len; $i++) {
+			$code = substr($seq,$i,3);
+			#atg
+			if ($code eq $start1) {
+				for (my $j = $i; $j < $len; $j = $j + 3) {
+					$codon = substr($seq,$j,3);
+					if ($codon eq $end1 or $codon eq $end2 or $codon eq $end3) {
+						if ($orf !~ /\-/ and length($orf) >= $min and length($orf) <= $max) {
+							$start_point = $i + 1;
+							$end_point = $i + 3 + (3 * length($orf));
+							print PRO ">$chr|start_ATG:$start_point stop:$end_point|strand:+\n$orf\n";
+							print GENE ">chr_$chr|start_ATG:$start_point stop:$end_point|strand:+\n$gene\n";
+							last;
+						}
+						else {
+							last;
+						}
+					}
+					elsif ($codon =~ /N../ or $codon =~ /NN./ or $codon =~ /.N./ or $codon =~ /..N/ or $codon =~ /.NN/ or $codon =~ /N.N/) {
+						$orf = $orf.'X';
+						$gene = $gene.$codon;
+					}
+					elsif (exists $index{$codon}) {
+						$orf = $orf.$index{$codon};
+						$gene = $gene.$codon;
+					}
+					else {
+						last;
+					}
+				}
+				$orf = "";
+				$gene = "";
+			}
+			#ttg
+			elsif ($code eq $start2) {
+				for (my $j = $i; $j < $len; $j = $j + 3) {
+					$codon = substr($seq,$j,3);
+					if ($codon eq $end1 or $codon eq $end2 or $codon eq $end3) {
+						if ($orf !~ /\-/ and length($orf) >= $min and length($orf) <= $max) {
+							$start_point = $i + 1;
+							$end_point = $i + 3 + (3 * length($orf));
+							print PRO ">chr_$chr|start_TTG:$start_point stop:$end_point|strand:+\n$orf\n";
+							print GENE ">chr_$chr|start_TTG:$start_point stop:$end_point|strand:+\n$gene\n";
+							last;
+						}
+						else {
+							last;
+						}
+					}
+					elsif ($codon =~ /N../ or $codon =~ /NN./ or $codon =~ /.N./ or $codon =~ /..N/ or $codon =~ /.NN/ or $codon =~ /N.N/) {
+						$orf = $orf.'X';
+						$gene = $gene.$codon;
+					}
+					elsif (exists $index{$codon}) {
+						$orf = $orf.$index{$codon};
+						$gene = $gene.$codon;
+					}
+					else {
+						last;
+					}
+				}
+				$orf = "";
+				$gene = "";
+			}
+			#ctg
+			elsif ($code eq $start3) {
+				for (my $j = $i; $j < $len; $j = $j + 3) {
+					$codon = substr($seq,$j,3);
+					if ($codon eq $end1 or $codon eq $end2 or $codon eq $end3) {
+						if ($orf !~ /\-/ and length($orf) >= $min and length($orf) <= $max) {
+							$start_point = $i + 1;
+							$end_point = $i + 3 + (3 * length($orf));
+							print PRO ">chr_$chr|start_CTG:$start_point stop:$end_point|strand:+\n$orf\n";
+							print GENE ">chr_$chr|start_CTG:$start_point stop:$end_point|strand:+\n$gene\n";
+							last;
+						}
+						else {
+							last;
+						}
+					}
+					elsif ($codon =~ /N../ or $codon =~ /NN./ or $codon =~ /.N./ or $codon =~ /..N/ or $codon =~ /.NN/ or $codon =~ /N.N/) {
+						$orf = $orf.'X';
+						$gene = $gene.$codon;
+					}
+					elsif (exists $index{$codon}) {
+						$orf = $orf.$index{$codon};
+						$gene = $gene.$codon;
+					}
+					else {
+						last;
+					}
+				}
+				$orf = "";
+				$gene = "";
+			}
+			#gtg
+			elsif ($code eq $start4) {
+				for (my $j = $i; $j < $len; $j = $j + 3) {
+					$codon = substr($seq,$j,3);
+					if ($codon eq $end1 or $codon eq $end2 or $codon eq $end3) {
+						if ($orf !~ /\-/ and length($orf) >= $min and length($orf) <= $max) {
+							$start_point = $i + 1;
+							$end_point = $i + 3 + (3 * length($orf));
+							print PRO ">chr_$chr|start_GTG:$start_point stop:$end_point|strand:+\n$orf\n";
+							print GENE ">chr_$chr|start_GTG:$start_point stop:$end_point|strand:+\n$gene\n";
+							last;
+						}
+						else {
+							last;
+						}
+					}
+					elsif ($codon =~ /N../ or $codon =~ /NN./ or $codon =~ /.N./ or $codon =~ /..N/ or $codon =~ /.NN/ or $codon =~ /N.N/) {
+						$orf = $orf.'X';
+						$gene = $gene.$codon;
+					}
+					elsif (exists $index{$codon}) {
+						$orf = $orf.$index{$codon};
+						$gene = $gene.$codon;
+					}
+					else {
+						last;
+					}
+				}
+				$orf = "";
+				$gene = "";
+			}
+			else {
+				next;
+			}
+		}
+
+		#strand -
+		if ($type eq "RNA") {
+			next;
+		}
+		else {
+			for (my $i = 0; $i < $len; $i++) {
+				$code_r = substr($seq_r,$i,3);
+				#atg
+				if ($code_r eq $start1_r) {
+					for (my $j = $i; $j < $len; $j = $j + 3) {
+						$codon_r = substr($seq_r,$j,3);
+						if ($codon_r eq $end1_r or $codon_r eq $end2_r or $codon_r eq $end3_r) {
+							if ($orf !~ /\-/ and length($orf) >= $min and length($orf) <= $max) {
+								$start_point = $i + 1;
+								$end_point = $i + 3 + (3 * length($orf));
+								print PRO ">chr_$chr|start_ATG:$start_point stop:$end_point|strand:-\n$orf\n";
+								print GENE ">chr_$chr|start_ATG:$start_point stop:$end_point|strand:-\n$gene\n";
+								last;
+							}
+							else {
+								last;
+							}
+						}
+						elsif ($codon_r =~ /N../ or $codon_r =~ /NN./ or $codon_r =~ /.N./ or $codon_r =~ /..N/ or $codon_r =~ /.NN/ or $codon_r =~ /N.N/) {
+							$orf = $orf.'X';
+							$gene = $gene.$codon_r;
+						}
+						elsif (exists $index_r{$codon_r}) {
+							$orf = $orf.$index_r{$codon_r};
+							$gene = $gene.$codon_r;
+						}
+						else {
+							last;
+						}
+					}
+					$orf = "";
+					$gene = "";
+				}
+				#ttg
+				elsif ($code_r eq $start2_r) {
+					for (my $j = $i; $j < $len; $j = $j + 3) {
+						$codon_r = substr($seq_r,$j,3);
+						if ($codon_r eq $end1_r or $codon_r eq $end2_r or $codon_r eq $end3_r) {
+							if ($orf !~ /\-/ and length($orf) >= $min and length($orf) <= $max) {
+								$start_point = $i + 1;
+								$end_point = $i + 3 + (3 * length($orf));
+								print PRO ">chr_$chr|start_TTG:$start_point stop:$end_point|strand:-\n$orf\n";
+								print GENE ">chr_$chr|start_TTG:$start_point stop:$end_point|strand:-\n$gene\n";
+								last;
+							}
+							else {
+								last;
+							}
+						}
+						elsif ($codon_r =~ /N../ or $codon_r =~ /NN./ or $codon_r =~ /.N./ or $codon_r =~ /..N/ or $codon_r =~ /.NN/ or $codon_r =~ /N.N/) {
+							$orf = $orf.'X';
+							$gene = $gene.$codon_r;
+						}
+						elsif (exists $index_r{$codon_r}) {
+							$orf = $orf.$index_r{$codon_r};
+							$gene = $gene.$codon_r;
+						}
+						else {
+							last;
+						}
+					}
+					$orf = "";
+					$gene = "";
+				}
+				#ctg
+				elsif ($code_r eq $start3_r) {
+					for (my $j = $i; $j < $len; $j = $j + 3) {
+						$codon_r = substr($seq_r,$j,3);
+						if ($codon_r eq $end1_r or $codon_r eq $end2_r or $codon_r eq $end3_r) {
+							if ($orf !~ /\-/ and length($orf) >= $min and length($orf) <= $max) {
+								$start_point = $i + 1;
+								$end_point = $i + 3 + (3 * length($orf));
+								print PRO ">chr_$chr|start_CTG:$start_point stop:$end_point|strand:-\n$orf\n";
+								print GENE ">chr_$chr|start_CTG:$start_point stop:$end_point|strand:-\n$gene\n";
+								last;
+							}
+							else {
+								last;
+							}
+						}
+						elsif ($codon_r =~ /N../ or $codon_r =~ /NN./ or $codon_r =~ /.N./ or $codon_r =~ /..N/ or $codon_r =~ /.NN/ or $codon_r =~ /N.N/) {
+							$orf = $orf.'X';
+							$gene = $gene.$codon_r;
+						}
+						elsif (exists $index_r{$codon_r}) {
+							$orf = $orf.$index_r{$codon_r};
+							$gene = $gene.$codon_r;
+						}
+						else {
+							last;
+						}
+					}
+					$orf = "";
+					$gene = "";
+				}
+				#gtg
+				elsif ($code_r eq $start4_r) {
+					for (my $j = $i; $j < $len; $j = $j + 3) {
+						$codon_r = substr($seq_r,$j,3);
+						if ($codon_r eq $end1_r or $codon_r eq $end2_r or $codon_r eq $end3_r) {
+							if ($orf !~ /\-/ and length($orf) >= $min and length($orf) <= $max) {
+								$start_point = $i + 1;
+								$end_point = $i + 3 + (3 * length($orf));
+								print PRO ">chr_$chr|start_GTG:$start_point stop:$end_point|strand:-\n$orf\n";
+								print GENE ">chr_$chr|start_GTG:$start_point stop:$end_point|strand:-\n$gene\n";
+								last;
+							}
+							else {
+								last;
+							}
+						}
+						elsif ($codon_r =~ /N../ or $codon_r =~ /NN./ or $codon_r =~ /.N./ or $codon_r =~ /..N/ or $codon_r =~ /.NN/ or $codon_r =~ /N.N/) {
+							$orf = $orf.'X';
+							$gene = $gene.$codon_r;
+						}
+						elsif (exists $index_r{$codon_r}) {
+							$orf = $orf.$index_r{$codon_r};
+							$gene = $gene.$codon_r;
+						}
+						else {
+							last;
+						}
+					}
+					$orf = "";
+					$gene = "";
+				}
+				else {
+					next;
+				}
+			}
+		}
+	}
+}	
+
+close IN;

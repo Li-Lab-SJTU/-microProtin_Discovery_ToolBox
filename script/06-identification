@@ -1,0 +1,354 @@
+#!/usr/bin/perl -w
+use utf8;
+use strict;use warnings;
+
+open (TANDEM,"<$ARGV[0]") or die "could not open the X!tandem out file!\n";
+open (F,">f.txt") or die "could not write f.txt!\n";
+open (R,">r.txt") or die "could not write r.txt!\n";
+
+my $i = 0;
+my $j = 0;
+my @fscore;
+my @rscore;
+my $flag = 0;
+my @fspectrum;
+my @rspectrum;
+
+while (<TANDEM>) {
+	chomp;
+	if (/^\<note label\=\"description\"\>.+OS=Homo sapiens OX=9606.+\:reversed\<\/note\>/ or /^\<note label\=\"description\"\>smORF_.+\:reversed\<\/note\>/) {
+		$flag = 1;
+		$j++;
+		next;
+	}
+	elsif (/^\<note label\=\"description\"\>.+OS=Homo sapiens OX=9606.+\<\/note\>/ or /^\<note label\=\"description\"\>smORF_.+\<\/note\>/) {
+		$flag = 0;
+		$i++;
+		next;
+	}
+	else {
+		if ($flag == 1 and /^\<domain id="(\d+)[\.\d]+".+hyperscore="([\d\.]+)" .+/) {
+			$rspectrum[$j] = $1;
+			$rscore[$j] = $2;
+			print R "$rspectrum[$j]\t$rscore[$j]\n";
+			next;
+		}
+		elsif ($flag == 0 and /^\<domain id="(\d+)[\.\d]+".+hyperscore="([\d\.]+)" .+/) {
+			$fspectrum[$i] = $1;
+			$fscore[$i] = $2;
+			print F "$fspectrum[$i]\t$fscore[$i]\n";
+			next;
+		}
+		else {
+			next;
+		}
+	}
+}
+
+close F;
+close R;
+close TANDEM;
+
+system("sort -n -r -k 2 f.txt | sort -n -k 1,1 -u > uniq_f.txt");
+system("sort -n -r -k 2 r.txt | sort -n -k 1,1 -u > uniq_r.txt");
+system("awk '{print \$1}' uniq_f.txt > uniq_spec_f.txt");
+system("awk '{print \$1}' uniq_r.txt > uniq_spec_r.txt");
+
+open (RSPEC,"uniq_spec_r.txt") or die "could not open the uniq_spec_r file!\n";
+open (FSPEC,"uniq_spec_f.txt") or die "could not open the uniq_spec_f file!\n";
+open (RMSPEC,">rm_spec.txt") or die "could not write the rm_spec file!\n";
+
+my @fspec = <FSPEC>;
+chomp @fspec;
+my $r_spec;
+
+while (<RSPEC>) {
+	chomp;
+	$r_spec = $_;
+	for (my $i = 0; $i < @fspec; $i++) {
+		if ($r_spec > $fspec[$i]) {
+			next;
+		}
+		elsif ($r_spec == $fspec[$i]) {
+			print RMSPEC "$r_spec\n";
+		}
+		else {
+			last;
+		}
+	}
+}
+
+close RSPEC;
+close FSPEC;
+close RMSPEC;
+
+open (RS,"uniq_r.txt") or die "could not open the uniq_r.txt file!\n";
+open (FS,"uniq_f.txt") or die "could not open the uniq_f.txt file!\n";
+open (RM,"rm_spec.txt") or die "could not open the RM file!\n";
+open (RSCORE,">score_r.txt") or die "could not write the score_r.txt file!\n";
+open (FSCORE,">score_f.txt") or die "could not write the score_f.txt file!\n";
+
+my @rm = <RM>;
+chomp @rm;
+my @line_spec_score;
+
+while (<RS>) {
+	chomp;
+	@line_spec_score = split (/\t/,$_);
+	if (grep /^$line_spec_score[0]$/,@rm) {
+		next;
+	}
+	else {
+		print RSCORE "$line_spec_score[1]\n";
+	}
+}
+
+while (<FS>) {
+	chomp;
+	@line_spec_score = split (/\t/,$_);
+	if (grep /^$line_spec_score[0]$/,@rm) {
+		next;
+	}
+	else {
+		print FSCORE "$line_spec_score[1]\n";
+	}
+}
+
+close RS;
+close FS;
+close RSCORE;
+close FSCORE;
+
+system("sort -n -r score_f.txt > sort_f.txt"); 
+system("sort -n -r score_r.txt > sort_r.txt");
+
+open (TANDEM,"<$ARGV[0]") or die "could not open the X!tandem out file!\n";
+open (RSORT,"sort_r.txt") or die "could not open the uniq_r.txt file!\n";
+open (FSORT,"sort_f.txt") or die "could not open the uniq_f.txt file!\n";
+open (IDENTPER,">ident_per.txt") or die "could not write the ident_per.txt file!\n";
+
+my @f = <FSORT>;
+chomp @f;
+my @r = <RSORT>;
+chomp @r;
+my $fraction;
+my @protein;
+my @id;
+my @score;
+my @seq;
+my @start;
+my @end;
+my $nr;
+my $nf;
+my $fdr_global;
+my $fdr;
+$flag = 0;
+my $a = 0.838677063400569;
+my $b = 0.485078858847771;
+my $tmp;
+$i = 0;
+
+while (<TANDEM>) {
+	chomp;
+	if (/<bioml xmlns:GAML=.+label\=\"models from \'.+\/(FN.+\d+)\.mzML\'\">/) {
+		$fraction = $1;
+		next;
+	}
+	elsif (/^\<note label\=\"description\"\>(.+OS=Homo sapiens OX=9606.+\:reversed)\<\/note\>/ or /^\<note label\=\"description\"\>(smORF_.+\:reversed)\<\/note\>/) {
+		$flag = 0;
+		next;
+	}
+	elsif (/^\<note label\=\"description\"\>(smORF_\d+)\|.+\<\/note\>/) {
+		$i++;
+		$protein[$i] = $1;
+		$flag = 1;
+		next;
+	}
+	elsif (/^\<note label\=\"description\"\>(.+_HUMAN) .+OS=Homo sapiens OX=9606.+\<\/note\>/ or /^\<note label\=\"description\"\>(.+ OS=Homo sapiens) OX=9606.+\<\/note\>/) {
+		$i++;
+		$protein[$i] = $1;
+		$flag = 2;
+		next;
+	}
+	else {
+		if ($flag == 1 and /^\<domain id="(\d+)[\.\d]+" start="(\d+)" end="(\d+)".+hyperscore="([\d\.]+)".+ seq="(\w+)"/) {
+			$id[$i] = $1;
+			$start[$i] = $2;
+			$end[$i] = $3;
+			$score[$i] = $4;
+			$seq[$i] = $5;
+			if (grep /^$id[$i]$/,@rm) {
+				next;
+			}
+			else {
+				for (my $m = 0; $m < @f; $m++) {
+					if ($f[$m] < $score[$i]) {
+						$nf = $m;
+						last;
+					}
+					else {
+						next;
+					}
+				}
+				for (my $n = 0; $n < @r; $n++) {
+					if ($r[$n] < $score[$i]) {
+						$nr = $n;
+						last;
+					}
+					else {
+						next;
+					}
+				}
+				$fdr_global = (2*$nr/($nr+$nf));
+				$tmp = (6*(1-$a)/(6-$b));
+				$fdr = ($fdr_global/($fdr_global+$tmp*(1-$fdr_global)));
+				if ($fdr <= 0.01) {
+					print IDENTPER "$protein[$i]&$start[$i];$end[$i]&$fdr\t$seq[$i];$score[$i];$id[$i];$fraction\n";
+					$flag = 0;
+					next;
+				}
+				else {
+					$flag = 0;
+					next;
+				}
+			}
+		}
+		elsif ($flag == 2 and /^\<domain id="(\d+)[\.\d]+" start="(\d+)" end="(\d+)".+hyperscore="([\d\.]+)".+ seq="(\w+)"/) {
+			$id[$i] = $1;
+			$start[$i] = $2;
+			$end[$i] = $3;
+			$score[$i] = $4;
+			$seq[$i] = $5;
+			if (grep /^$id[$i]$/,@rm) {
+				next;
+			}
+			else {
+				for (my $m = 0; $m < @f; $m++) {
+					if ($f[$m] < $score[$i]) {
+						$nf = $m;
+						last;
+					}
+					else {
+						next;
+					}
+				}
+				for (my $n = 0; $n < @r; $n++) {
+					if ($r[$n] < $score[$i]) {
+						$nr = $n;
+						last;
+					}
+					else {
+						next;
+					}
+				}
+				$fdr_global = (2*$nr/($nr+$nf));
+				$tmp = ((6*$a)/$b);
+				$fdr = ($fdr_global/($fdr_global+$tmp*(1-$fdr_global)));
+				if ($fdr <= 0.01) {
+					print IDENTPER "$protein[$i]&$start[$i];$end[$i]&$fdr\t$seq[$i];$score[$i];$id[$i];$fraction\n";
+					$flag = 0;
+					next;
+				}
+				else {
+					$flag = 0;
+					next;
+				}
+			}
+		}
+		else {
+			next;
+		}
+	}
+}
+
+close TANDEM;
+close RM;
+close RSORT;
+close FSORT;
+close IDENTPER;
+
+open (PER,"ident_per.txt") or die "could not open the ident_per.txt file!\n";
+open (TMP,">tmp.txt") or die "could not write the tmp file!\n";
+
+my @info_1 = ();
+my %index_1;
+my $pro_1 = "";
+my $tag_1 = "";
+
+while (<PER>) {
+	chomp;
+	@info_1 = split(/\t/,$_);
+	$pro_1 = $info_1[0];
+	$tag_1 = $info_1[1];
+	if (exists $index_1{$tag_1}) {
+		$index_1{$tag_1} = $pro_1."^".$index_1{$tag_1};
+	}
+	else {
+		$index_1{$tag_1} = $pro_1;
+	}
+}
+
+my @key = keys %index_1;
+
+foreach (@key) {
+	my @ident = split(/;/,$_);
+	print TMP "$index_1{$_}"."#"."$ident[0]\t$ident[1];$ident[2];$ident[3]\n";
+}
+
+close TMP;
+close PER;
+
+open (TMP1,"tmp.txt") or die "could not open the tmp file!\n";
+open (TMP2,">tmp2.txt") or die "could not write the tmp2 file!\n";
+
+my @info_2 = ();
+my %index_2;
+my $pro_2 = "";
+my $tag_2 = "";
+
+while (<TMP1>) {
+	chomp;
+	@info_2 = split(/\t/,$_);
+	$pro_2 = $info_2[0];
+	$tag_2 = $info_2[1];
+	if (exists $index_2{$tag_2}) {
+		next;
+	}
+	else {
+		$index_2{$tag_2} = $pro_2;
+	}
+}
+
+my @key2 = keys %index_2;
+
+foreach (@key2) {
+	my @ident = split(/;/,$_);
+	print TMP2 "$index_2{$_}!$ident[0]!$ident[1];$ident[2]\n";
+}
+
+close TMP1;
+close TMP2;
+
+system("sort -n -r -t '!' -k 2,2 tmp2.txt | sort -t '!' -k 3,3 -u > ident_filter.txt");
+system("rm tmp.txt tmp2.txt ident_per.txt");
+
+open (MERGETMP,"ident_filter.txt") or die "could not open the tmp.txt file!\n";
+
+my @info_3;
+my @part;
+
+while (<MERGETMP>) {
+	chomp;
+	if (/.+/) {
+		@info_3 = split(/!/,$_);
+		@part = split(/;/,$info_3[2]);
+		print "$info_3[0]\t$info_3[1]\t$part[0]\t$part[1]\n";
+	}
+	else {
+		next;
+	}
+}
+
+system("rm ident_filter.txt");
+close MERGETMP;
+system ("rm rm_spec.txt *r.txt *f.txt");

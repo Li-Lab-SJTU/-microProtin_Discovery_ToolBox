@@ -1,0 +1,31 @@
+#!/usr/bin/perl -w
+use utf8;
+use strict;use warnings;
+
+open (IN,"<$ARGV[0]")||die "could not open the sequence file!";
+
+my $seq = "";
+my $line = `wc -l $ARGV[0]`;
+$line =~ /(\d+) .+/;
+$line = $1;
+my $i = 0;
+while (<IN>) {
+	chop($_) while ($_ =~/[\r\n]$/);
+	$i++;
+	if (/^\>.+/) {
+		if ($seq ne "") {
+			print "$seq\n";
+			$seq = "";
+		}
+		print  "$_\n";
+	}
+	else {
+		$seq = $seq.$_;
+	}
+	if ($i == $line) {
+		print "$seq\n";
+		$seq = "";
+	}
+}
+
+close IN;

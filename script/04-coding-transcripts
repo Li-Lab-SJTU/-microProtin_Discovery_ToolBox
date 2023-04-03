@@ -1,0 +1,54 @@
+#!/usr/bin/perl -w
+
+use utf8;
+use strict;use warnings;
+
+open (NAME,"<$ARGV[0]")||die "could not open the name file!";
+open (ALL,"<$ARGV[1]")||die "could not open the all file!";
+
+my @id;
+
+while (<NAME>) {
+	chomp;
+	push(@id,$_);
+}
+
+my $flag = 0;
+
+while (<ALL>) {
+	chomp;
+	if (/\>(\d+) /) {
+		my $num = $1;
+		if (@id == 0) {
+			last;
+		}
+		else {
+			for (my $i = 0; $i < @id; $i++) {
+				if ($num eq $id[$i]) {
+					$flag = 1;
+					print "$_\n";
+					splice(@id,$i,1);
+#					print "@id\n";
+					$i--;
+					last;
+				}
+				else {
+					$flag = 0;
+					next;
+				}
+			}
+		}
+	}
+	else {
+		if ($flag == 1) {
+			print "$_\n";
+			next;
+		}
+		else {
+			next;
+		}
+	}
+}
+
+close NAME;
+close ALL;

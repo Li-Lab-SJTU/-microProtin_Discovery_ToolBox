@@ -1,0 +1,25 @@
+#!/usr/bin/perl -w
+
+use utf8;
+use strict;use warnings;
+
+open (IN,"<$ARGV[0]") or die "could not open the result file!\n";
+
+my @pro;
+my $save;
+
+while (<IN>) {
+	chomp;
+	if (/(.+\d+)\#(\w+\t.+)/) {
+		@pro = split(/\^/,$1);
+		$save = $2;
+		for (my $i = 0; $i < @pro; $i++) {
+			print "$pro[$i]\t$save\n";
+		}
+	}
+	else {
+		next;
+	}
+}
+
+close IN;

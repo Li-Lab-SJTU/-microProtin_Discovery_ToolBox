@@ -1,0 +1,29 @@
+#!/usr/bin/perl -w
+use utf8;
+use strict;use warnings;
+
+open (IN,"<$ARGV[0]") or die "could not open the result file!\n";
+open (REF,"<$ARGV[1]") or die "could not open the ref file!\n";
+
+my %ref;
+my $flag;
+my $name;
+
+while (<REF>) {
+	chomp;
+	if (/>(.+)/) {
+		$flag = 1;
+		$name = $1;		
+	}
+	else {
+		$ref{$name} = $_;
+		$flag = 0;
+	}
+}
+
+while (<IN>) {
+	chomp;
+	print "$ref{$_}\n";
+}
+
+close IN;

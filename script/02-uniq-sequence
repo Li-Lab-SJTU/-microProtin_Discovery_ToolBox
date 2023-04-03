@@ -1,0 +1,48 @@
+#!/usr/bin/perl -w                                                 ##
+#Usage:fastq edition	  				                           ##
+#Command:perl .pl .fastq > .fastq  	    			               ##
+#Author:Jingya Jia                                                 ##
+#Time:2019-08-06                                                   ##
+#####################################################################
+
+use utf8;
+use strict;use warnings;
+
+open (IN,"<$ARGV[0]")||die "could not open the sequence file!";
+
+my @seq;
+my $name;
+my $sequence;
+my %uniq;
+
+while (<IN>) {
+#	chomp;
+	chop($_) while ($_ =~/[\r\n]$/);
+	if (/^\>(.+)/) {
+		push(@seq,$1);
+	}
+	else {
+		push(@seq,$_);
+	}
+	if (@seq == 2) {
+		$name = $seq[0];
+		$sequence = $seq[1];
+		if (exists $uniq{$sequence}) {
+			$uniq{$sequence} = $uniq{$sequence}.';'.$name;
+			@seq = ();
+		}
+		else {
+			$uniq{$sequence} = $name;
+			@seq = ();
+		}
+	}
+	else {
+		next;
+	}
+}
+
+while (my ($tag,$value) = each%uniq) {
+	print ">$value\n$tag\n";
+}
+		
+close IN;

@@ -1,0 +1,5 @@
+1. Reference genome in FASTA and GTF format
+2. The protein sequences deposited in NR database in FASTA format
+3. The protein sequences deposited in UniProt database in FASTA format
+4. RNA-seq data
+5. Proteomic MS/MS data

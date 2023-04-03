@@ -1,0 +1,43 @@
+#!/usr/bin/perl -w
+use utf8;
+use strict;use warnings;
+
+open (NR,"<$ARGV[0]")||die "could not open the sequence file!";
+
+my @seq;
+my $name;
+my $sequence;
+my %uniq;
+
+while (<NR>) {
+#	chomp;
+	chop($_) while ($_ =~/[\r\n]$/);
+	if (/^\>(.+)/) {
+		next;
+	}
+	else {
+		$uniq{$_} = $_;
+	}
+}
+
+close NR;
+
+open (IN,"<$ARGV[1]")||die "could not open the sequence file!";
+
+while (<IN>) {
+	chomp;
+	if (/^>.+/) {
+		$name = $_;
+	}
+	else {
+		if (exists $uniq{$_}) {
+			next;
+		}
+		else {
+			print "$name\n$_\n";
+		}
+	}
+}
+
+close IN;
+

@@ -1,0 +1,85 @@
+#!/usr/bin/perl -w
+use utf8;
+use strict;use warnings;
+
+open (IN,"<$ARGV[0]") or die "could not open the result file!\n";
+open (REF,"<$ARGV[1]") or die "could not open the ref file!\n";
+
+my %ref;
+my $flag;
+my $name;
+
+while (<REF>) {
+	chomp;
+	if (/>(\w+\|.+\|.+_HUMAN).+/) {
+		$flag = 1;
+		$name = $1;		
+	}
+	elsif (/^[A-Z]+/ and $flag == 1) {
+		$ref{$name} = $_;
+		$flag = 0;
+	}
+	else {
+		$flag = 0;
+	}
+}
+
+my @array;
+my $qlen;
+my $difference;
+my $check;
+
+while (<IN>) {
+	chomp;
+	@array = split(/\t/,$_);
+	$array[0] =~ /length:(\d+)/;
+	$qlen = $1;
+	$difference = $qlen - $array[3];
+	if ($qlen == $array[3] and $array[2] == 100.0) {
+		next;
+	}
+	elsif ($difference > 1) {
+		next;
+	}
+	elsif ($difference == 0 and $array[4] == 1 and $array[5] == 0) {
+		if ($array[8] == 1) {
+                        print "$_\n";
+                }
+		else {
+			$check = substr($ref{$array[1]},$array[8] - 2,1);
+			if ($check eq "R" or $check eq "K") {
+				print "$_\n";
+			}
+			else {
+				next;
+			}
+		}
+        }
+	elsif ($difference == 0 and $array[4] > 1 or $array[5] > 1) {
+		next;
+        }
+	elsif ($difference == 1 and $array[4] == 0 and $array[5] == 0) {
+		if ($array[8] == 1) {
+			print "$_\n";
+		}
+		else {
+			$check = substr($ref{$array[1]},$array[8] - 2,1);
+        	        if ($check eq "R" or $check eq "K") {
+                	        print "$_\n";
+	                }
+        	        else {
+                	        next;
+	                }
+		}
+        }
+	elsif ($difference == 1 and $array[4] > 0) {
+		next;
+	}
+	else {
+		next;
+	}	
+}
+
+close IN;
+close REF;
+

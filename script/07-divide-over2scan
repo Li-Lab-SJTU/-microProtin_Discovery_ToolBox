@@ -1,0 +1,54 @@
+#!/usr/bin/perl -w
+use utf8;
+use strict;use warnings;
+
+open (IN,"<$ARGV[0]")||die "could not open the name file!";
+my %index;
+my $tag;
+
+while (<IN>) {
+	chomp;
+	$_ =~ /#(\w+)\t/;
+	$tag = $1;
+	if (exists $index{$tag}) {
+		$index{$tag} = $index{$tag} + 1;
+	}
+	else {
+		$index{$tag} = 1;
+	}
+	$tag = "";
+}
+
+open (IN,"<$ARGV[0]") or die "could not open the name file!";
+open (HUMAN,">>$ARGV[1]") or die "could not known.txt!\n";
+open (NOVEL,">>$ARGV[2]") or die "could not novel.txt.txt!\n";
+my $species = $ARGV[3];
+my $query;
+my $line;
+
+while (<IN>) {
+	chomp;
+	$line = $_;
+	if (/#(\w+)\t/) {
+		$query = $1;
+		if ($index{$query} > 1) {
+			if ($line =~ /$species/) {
+				print HUMAN "$line\n";
+			}
+			else {
+				print NOVEL "$line\n";
+			}
+		}
+		else {
+			next;
+		}
+	}
+	else {
+		next;
+	}
+}
+
+close IN;
+close NOVEL;
+close HUMAN;
+
